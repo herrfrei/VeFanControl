@@ -1,0 +1,8 @@
+V1.2
+rename dbus service name from Rpi-cpu to RpiCpu
+
+V1.1
+added support for setting custom name of temperature
+
+V1.0
+Initial version
