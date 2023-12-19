@@ -1,4 +1,7 @@
 #! /usr/bin/env python3
+#
+# writes GPIO pin given as PWM pin to config file, exits with 1 on failure
+
 from fan_control import read_config, get_pwm_channel, write_config
 import sys
 

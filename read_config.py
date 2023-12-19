@@ -1,4 +1,7 @@
 #! /usr/bin/env python3
+#
+# read configuration from fan_control or config file and output it for bash usage
+
 from fan_control import read_config
 
 

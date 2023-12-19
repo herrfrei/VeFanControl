@@ -1,4 +1,7 @@
 #! /usr/bin/env python3
+#
+# PWM fan control program
+
 import os.path
 import json
 import time
