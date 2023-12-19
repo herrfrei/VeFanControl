@@ -4,53 +4,107 @@
 # This modification adds the raspberry pi temperature to Victron Venus OS
 # and allows a PWM fan control
 
-# Venus files that need to be updated to activeate this package
-qmlDir=/opt/victronenergy/gui/qml
-
 packageLogFile="/var/log/VeFanControl/current"
+overlayFile="/u-boot/overlays/gpio-led.dtbo"
+configFile="/u-boot/config.txt"
 
 #### following lines incorporate SetupHelper utilities into this script
 # Refer to the SetupHelper ReadMe file for details.
-    
+
 source "/data/SetupHelper/CommonResources"
 
 #### end of lines to include SetupHelper
 
 #### running manually and OK to proceed - prompt for input
 if [ $scriptAction == 'NONE' ] ; then
-    echo
-    echo "The VeFanControl adds Rasperry Pi CPU Temperture bases PWM fan control"    
-    echo
-    standardActionPrompt
+	echo
+	echo "The VeFanControl adds Rasperry Pi CPU Temperture bases PWM fan control"
+	echo
+	echo "  - installs the overlay file for the PWM pin"
+	echo "  - adds the PWM setup to config.txt"    
+	echo
+	yesNoPrompt "Do you want to continue (y/n)?: "
+	if $yesResponse ; then
+		scriptAction='INSTALL'
+		eval `python3 read_config.py`
+
+		yesNoPrompt "Change GPIO pin for PWM (default: $pwm_pin) (y/n)?: "
+		if $yesResponse ; then
+			read -p "enter GPIO pin to use for PWM: " gpioPin
+			if [ "$gpioPin" != "" ]; then
+				# check it
+				python3 write_pwm_pin.py $gpioPin
+				if [ "$?" -ne 0 ]; then
+					scriptAction=''
+					echo "Invalid pin $gpioPin given!"
+				else
+					echo "Using PWM pin $gpioPin"
+				fi				
+			else
+				scriptAction=''
+				echo "No pin given!"				
+			fi
+		fi
+	fi
 fi
 
 #### here to do the actual work
 
 if [ $scriptAction == 'INSTALL' ] ; then
-    logMessage "++ Installing VeFanControl"
+	logMessage "++ Installing VeFanControl with the following settings:"
 
-    # updateActiveFile "$qmlDir/PageSettingsGeneral.qml"
-    # updateActiveFile "$qmlDir/PageSettingsShutdown.qml"
+	# read config entries to get the pwm pin
+	eval `python3 read_config.py`
 
-    installService $packageName
+	if [ $(grep -c "VeFanControl" "$configFile") == 0 ]; then
+		logMessage "activating VeFanControl settings in $configFile"
+		cp $configFile $configFile.tmp
+		# remove any previouos lines added by this script
+		sed -i -e "/#### begin VeFanControl/,/#### end VeFanControl/d" "$configFile.tmp"
 
-    if $filesUpdated ; then
-        restartGui=true
-    fi
+		echo "" >> "$configFile.tmp"
+		echo "#### begin VeFanControl" >> "$configFile.tmp"
+		echo "dtoverlay=pwm,pin=$pwm_pin,func=$pin_func" >> "$configFile.tmp"
+		echo "#### end VeFanControl" >> "$configFile.tmp"
+		echo "" >> "$configFile.tmp"
+		rebootNeeded=true
+		
+		[ -f "$overlayFile" ] || logMessage "installing PWM overlay" && rebootNeeded=true && updateActiveFile "$overlayFile"
+	fi
+	# detect changes
+	cmp -s $configFile "$configFile.tmp" > /dev/null
+	if (( $? == 1 )); then
+		logMessage "updating config.txt"
+		updateActiveFile "$configFile.tmp" "$configFile"
+		if $thisFileUpdated ; then
+			rebootNeeded=true
+		fi
+	else
+		rm $configFile.tmp
+	fi
+
+	installService $packageName
 fi
 
 # #### uninstalling - check scriptAction again
 # if an install step failed package needs to be removed
 if [ $scriptAction == 'UNINSTALL' ] ; then
-    logMessage "++ Uninstalling VeFanControl"
+	logMessage "++ Uninstalling VeFanControl"
+	
+	logMessage "restoring previous overlay file"
+	restoreActiveFile "$overlayFile"
+	# remove mods from configFile - do not use restore in case other mods were made manually
+    if [ -f "$configFile" ]; then
+        if [ $(grep -c "#### begin VeFanControl" "$configFile") != 0 ]; then
+			logMessage "removing VeFanControl settings from config.txt"
+            sed -i -e '/#### begin VeFanControl/,/#### end VeFanControl/d' "$configFile"
+            rebootNeeded=true
+        fi
+    fi
 
-    # restoreActiveFile "$qmlDir/PageSettingsGeneral.qml"
-    # restoreActiveFile "$qmlDir/PageSettingsShutdown.qml"
-    removeService $packageName
-fi
-
-if $filesUpdated ; then
-    restartGui=true
+	# restoreActiveFile "$qmlDir/PageSettingsGeneral.qml"
+	# restoreActiveFile "$qmlDir/PageSettingsShutdown.qml"
+	removeService $packageName
 fi
 
 # thats all folks - SCRIPT EXITS INSIDE THE FUNCTION

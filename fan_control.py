@@ -25,9 +25,9 @@ CONFIG_FILE = os.path.join(os.path.dirname(__file__), 'fan_control.cfg')
 # FAN_GAIN = float(FAN_HIGH - FAN_LOW) / float(MAX_TEMP - MIN_TEMP)
 
 
-options = {
+options = {    
+    'pwm_pin': 12,       # BCM PWM pin
     'pwm_freq':  25,     # [Hz] PWM frequency
-    'pwm_chan':  0,      # BCM pwm channel used to drive fan
     'wait_time': 10,     # [s] Time to wait between each refresh
     'off_temp':  40,     # [°C] temperature below which to stop the fan
     'min_temp':  45,     # [°C] temperature above which to start the fan
@@ -50,17 +50,54 @@ options = {
 # }
 
 
-def read_config(defaults: dict) -> dict:
-    config = defaults
+# PWM0: 12,4(Alt0) 18,2(Alt5) 40,4(Alt0)            52,5(Alt1)
+# PWM1: 13,4(Alt0) 19,2(Alt5) 41,4(Alt0) 45,4(Alt0) 53,5(Alt1)
+
+def get_pwm_channel(pwm_pin: int) -> int:
+    pwm_pin2chan = { 12: 0, 13: 1, 18: 0, 19: 1 }
+    if pwm_pin in pwm_pin2chan:
+        return pwm_pin2chan[pwm_pin]
+    return -1
+    
+
+def get_pin_func(pwm_pin: int) -> int:
+    pwm_pin2func = { 12: 4, 13: 4, 18: 2, 19: 2 }
+    if pwm_pin in pwm_pin2func:
+        return pwm_pin2func[pwm_pin]
+    return -1
+
+    
+def read_config(defaults: dict = options) -> dict:
+    cfg = defaults
     try:
         if not os.path.exists(CONFIG_FILE):
             # write default settings to file
             with open(CONFIG_FILE, 'w') as f:
                 json.dump(defaults, f)
         with open(CONFIG_FILE, 'r') as f:
-            config = json.load(f)
+            cfg = json.load(f)
+        cfg['pwm_chan'] = get_pwm_channel(cfg['pwm_pin'])
+        if cfg['pwm_chan'] < 0:
+            print(f"Invalid PWM pin {cfg['pwm_pin']} given!")
+            sys.exit(1)
+        cfg['pin_func'] = get_pin_func(cfg['pwm_pin'])
+        if cfg['pin_func'] < 0:
+            print(f"Invalid PWM pin {cfg['pwm_pin']} given!")
+            sys.exit(1)
+    except Exception as e:
+        print(f"Error occured: {e}")
     finally:
-        return config
+        return cfg
+
+
+def write_config(cfg: dict) -> bool:
+    try:
+        with open(CONFIG_FILE, 'w') as f:
+            json.dump(cfg, f)
+        return True
+    except Exception as e:
+        print(f"Error occured: {e}")
+        return False
 
 
 def handle_fan_speed(fan, cfg, fan_gain, temperature):
@@ -79,6 +116,9 @@ def main():
     fan_gain = float(cfg['max_pwm'] - cfg['min_pwm']) / float(cfg['max_temp'] - cfg['min_temp'])
     try:
         signal.signal(signal.SIGTERM, lambda *args: sys.exit(0))
+        if get_pwm_channel(cfg['pwm_pin']) < 0:
+            print(f"Invalid PWM pin {cfg['pwm_pin']} given!")
+            sys.exit(1)
         fan = PWM(cfg['pwm_chan'])
         fan.initialize()
         fan.set_period(cfg['pwm_freq'])

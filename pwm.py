@@ -26,15 +26,20 @@ class PWM():
         self.deinitialize()
 
     def deinitialize(self):
-        if self.is_enabled:
-            self.set_period(1)
-            self.disable()
-        with open(self.SYSFS_PWM_UNEXPORT_PATH, "a") as pwm_unexport:
-            pwm_unexport.write(str(self.channel))
+        try:
+            if self.is_enabled:
+                self.set_period(1)
+                self.disable()
+            with open(self.SYSFS_PWM_UNEXPORT_PATH, "a") as pwm_unexport:
+                pwm_unexport.write(str(self.channel))
+        except FileNotFoundError:
+            pass  # skip it since the error must result from initialize() - self.SYSFS_PWM_PATH_BASE or self.SYSFS_PWM_EXPORT_PATH not found
+        finally:
+            pass
 
     def initialize(self):
         if not os.path.exists(self.SYSFS_PWM_PATH_BASE):
-            raise OSError("rcio_pwm module wasn't loaded")
+            raise OSError(f"pwm module wasn't loaded ({self.SYSFS_PWM_PATH_BASE} not found)")
 
         if not os.path.exists(self.channel_path):
             with open(self.SYSFS_PWM_EXPORT_PATH, "a") as pwm_export:
