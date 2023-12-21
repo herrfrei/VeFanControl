@@ -5,7 +5,7 @@
 # and allows a PWM fan control
 
 packageLogFile="/var/log/VeFanControl/current"
-overlayFile="/u-boot/overlays/gpio-led.dtbo"
+overlayFile="/u-boot/overlays/pwm.dtbo"
 configFile="/u-boot/config.txt"
 
 #### following lines incorporate SetupHelper utilities into this script
