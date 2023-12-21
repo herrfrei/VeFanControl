@@ -1,4 +1,4 @@
-#! /usr/bin/env python3
+#!/usr/bin/env python3
 #
 # PWM fan control program
 
@@ -127,7 +127,7 @@ def main():
         fan.set_period(cfg['pwm_freq'])
         fan.enable()
         while True:
-            handleFanSpeed(fan, cfg, fan_gain, get_cpu_temperature())
+            handle_fan_speed(fan, cfg, fan_gain, get_cpu_temperature())
             time.sleep(cfg['wait_time'])
     except KeyboardInterrupt:
         pass
