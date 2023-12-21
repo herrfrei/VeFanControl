@@ -36,8 +36,8 @@ options = {
     'min_temp':  45,     # [°C] temperature above which to start the fan
     'max_temp':  70,     # [°C] temperature at which to operate at max fan speed
     'off_pwm':   0.0,    # PWM value for OFF state
-    'min_pwm':   1.0,    # Minimum PWM value
-    'max_pwm':   100.0,  # Minimum PWM value
+    'min_pwm':   10.0,   # Minimum PWM value
+    'max_pwm':   100.0,  # Maximum PWM value
 }
 
 # fan_control_settings = {
