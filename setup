@@ -54,23 +54,22 @@ if [ $scriptAction == 'INSTALL' ] ; then
 	logMessage "++ Installing VeFanControl with the following settings:"
 
 	# read config entries to get the pwm pin
-	eval `python3 read_config.py`
+	pushd $scriptDir && eval `python3 read_config.py` && popd
 
-	if [ $(grep -c "VeFanControl" "$configFile") == 0 ]; then
-		logMessage "activating VeFanControl settings in $configFile"
-		cp $configFile $configFile.tmp
-		# remove any previouos lines added by this script
-		sed -i -e "/#### begin VeFanControl/,/#### end VeFanControl/d" "$configFile.tmp"
-
-		echo "" >> "$configFile.tmp"
-		echo "#### begin VeFanControl" >> "$configFile.tmp"
-		echo "dtoverlay=pwm,pin=$pwm_pin,func=$pin_func" >> "$configFile.tmp"
-		echo "#### end VeFanControl" >> "$configFile.tmp"
-		echo "" >> "$configFile.tmp"
-		rebootNeeded=true
+	logMessage "activating VeFanControl settings in $configFile"
+	cp $configFile $configFile.tmp
+	
+	# remove any previouos lines added by this script
+	sed -i -e "/#### begin VeFanControl/,/#### end VeFanControl/d" "$configFile.tmp"
 		
-		[ -f "$overlayFile" ] || logMessage "installing PWM overlay" && rebootNeeded=true && updateActiveFile "$overlayFile"
-	fi
+	echo "" >> "$configFile.tmp"
+	echo "#### begin VeFanControl" >> "$configFile.tmp"
+	echo "dtoverlay=pwm,pin=$pwm_pin,func=$pin_func" >> "$configFile.tmp"
+	echo "#### end VeFanControl" >> "$configFile.tmp"
+	echo "" >> "$configFile.tmp"	
+	
+	[ -f "$overlayFile" ] || logMessage "installing PWM overlay" && rebootNeeded=true && updateActiveFile "$overlayFile"
+
 	# detect changes
 	cmp -s $configFile "$configFile.tmp" > /dev/null
 	if (( $? == 1 )); then
