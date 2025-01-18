@@ -57,30 +57,46 @@ if [ $scriptAction == 'INSTALL' ] ; then
   logMessage "++ Installing VeFanControl with the following settings:\n   pwm_pin=$pwm_pin pwm_freq=$pwm_freq wait_time=$wait_time\n   off_temp=$off_temp min_temp=$min_temp max_temp=$max_temp\n   off_pwm=$off_pwm min_pwm=$min_pwm max_pwm=$max_pwm\n   pwm_chan=$pwm_chan pin_func=$pin_func"
 
   logMessage "activating VeFanControl settings in $configFile"
-  cp $configFile $configFile.tmp
   
-  # remove any previouos lines added by this script
-  sed -i -e "/#### begin VeFanControl/,/#### end VeFanControl/d" "$configFile.tmp"
-    
-  echo "" >> "$configFile.tmp"
-  echo "#### begin VeFanControl" >> "$configFile.tmp"
-  echo "dtoverlay=pwm,pin=$pwm_pin,func=$pin_func" >> "$configFile.tmp"
-  echo "#### end VeFanControl" >> "$configFile.tmp"
-  echo "" >> "$configFile.tmp"  
-  
-  [ -f "$overlayFile" ] || logMessage "installing PWM overlay" && rebootNeeded=true && updateActiveFile "$overlayFile"
-
-  # detect changes
-  cmp -s $configFile "$configFile.tmp" > /dev/null
-  if (( $? == 1 )); then
-    logMessage "updating config.txt"
-    updateActiveFile "$configFile.tmp" "$configFile"
-    if $thisFileUpdated ; then
-      rebootNeeded=true
-    fi
+  overlayTemplate="/tmp/overlay"
+  cat >$overlayTemplate <<EOF
+#### begin VeFanControl
+dtoverlay=pwm,pin=$pwm_pin,func=$pin_func
+#### end VeFanControl
+EOF
+  if (( $(grep -c "#### begin VeFanControl" "$configFile") != 0 )); then
+    removeOverlay=true
+    oldOverlayText=$(sed -n -e "/#### begin VeFanControl/,/#### end VeFanControl/p" "$configFile" | grep dtoverlay)
   else
-    rm $configFile.tmp
+    oldOverlayText=""
+    removeOverlay=false
   fi
+  if [ -f "$overlayTemplate" ]; then
+    installOverlay=true
+    newOverlayText=$(grep dtoverlay "$overlayTemplate")
+  else
+    installOverlay=false
+    newOverlayText=""
+  fi
+  # logMessage "oldOverlayText: $oldOverlayText"
+  # logMessage "newOverlayText: $newOverlayText"
+  # correct overlay already installed - don't make changes
+  if $removeOverlay && $installOverlay && [ "$oldOverlayText" == "$newOverlayText" ]; then
+    removeOverlay=false
+    installOverlay=false
+  fi
+  if $removeOverlay ; then
+    logMessage "removing old overlay from config.txt"
+    sed -i -e "/#### begin VeFanControl/,/#### end VeFanControl/d" "$configFile"
+    rebootNeeded=true
+  fi
+  if $installOverlay ; then
+    logMessage "adding new overlay to config.txt"
+    cat "$overlayTemplate" >> $configFile
+    rebootNeeded=true
+  fi
+    
+  [ -f "$overlayFile" ] || logMessage "installing PWM overlay" && rebootNeeded=true && updateActiveFile "$overlayFile"
 
   installService $packageName
 fi
